@@ -1,0 +1,23 @@
+﻿@{
+    ViewBag.Title = "MVC-Thumbnails Demo";
+}
+
+<h2>Thumbnail Using "Small" Alias in web.config</h2>
+@Html.Thumbnail("bbq.jpg", "Small", new { style = "border: 1px solid black;" })
+
+<h2>Thumbnail Using "Medium" Alias in web.config</h2>
+@Html.Thumbnail("bbq.jpg", "Medium", new { style = "border: 1px solid black;" })
+
+<h2>Thumbnail Using "Large" Alias in web.config</h2>
+@Html.Thumbnail("bbq.jpg", "Large", new { style = "border: 1px solid black;" })
+
+<h2>Thumbnail for a file not found</h2>
+@Html.Thumbnail("asdf.jpg", 65, 65, null)
+
+<h2>Thumbnail size not defined with an alias</h2>
+@Html.Thumbnail("bbq.jpg", 65, 65, null)
+
+<h2>Image that does not need to be resized</h2>
+@Html.Thumbnail("bbq.jpg", 900, 600, new { style = "border: 1px solid #686a6a;" })
+
+<p>Tasty BBQ photo courtesy of <a href="http://www.freefoto.com">freefoto.com</a></p>
