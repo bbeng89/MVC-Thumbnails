@@ -2,11 +2,16 @@
 About
 =====
 This is a very simple project that aims to provide an HTML helper for generating thumbnails in ASP.NET MVC. 
+It is a work in progress. See "Todo" for stuff that could be improved or doesn't work.
+
+How it Works
+------------
+
 The first time a thumbnail is requested it will be generated and saved on the server. Additional requests for this 
 thumbnail will simply serve the image previously generated. Aliases for commonly used sizes can be defined in the 
 web.config file.
 
-The library keeps thumbnails organized according to their sizes. A "Thumbnails" directory is created inside the base 
+It keeps thumbnails organized according to their sizes. A "Thumbnails" directory is created inside the base 
 image path defined in the web.config file. A folder is then created for each size. For example, thumbnails of size 
 65x65 would be placed in baseImagePath/Thumbnails/65x65. Aliases are placed in a folder named [alias]-[dimensions]. 
 For example, an alias named "Large" that is defined as 150x150 would store its images in baseImagePath/Thumbnails/Large-150x150.
