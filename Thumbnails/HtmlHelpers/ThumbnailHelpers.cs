@@ -39,6 +39,7 @@ namespace Thumbnails.HtmlHelpers
 
 			//Merge any additional html attributes passed in
 			RouteValueDictionary additionalAttributes = HtmlHelper.AnonymousObjectToHtmlAttributes(htmlAttributes);
+
 			img.MergeAttributes(additionalAttributes);
 
 			return new MvcHtmlString(img.ToString());
@@ -82,8 +83,10 @@ namespace Thumbnails.HtmlHelpers
 		{
 			TagBuilder img = new TagBuilder("img");
 			bool originalMissing = false;
+
 			//the physical path to the directory defined in baseImagePath in web.config
 			String baseImagePhysicalPath = helper.ViewContext.HttpContext.Server.MapPath(settings.BaseImagePath);
+
 			//location of the original image
 			String originalImagePhysicalPath = Path.Combine(baseImagePhysicalPath, image);
 
@@ -98,6 +101,7 @@ namespace Thumbnails.HtmlHelpers
 
 			//If the original image was not found then use the settings.MissingImagePath filename - otherwise use the image requested
 			String thumbnailPath = Path.Combine(physicalThumbnailDir, originalMissing ? Path.GetFileName(originalImagePhysicalPath) : image);
+
 			//Will be /baseImagePath/Thumbnails/AliasFolderName/image.ext
 			String virtualThumbnailPath = String.Concat(VirtualPathUtility.ToAbsolute(settings.BaseImagePath),
 				"/Thumbnails/", folderName, "/", originalMissing ? Path.GetFileName(originalImagePhysicalPath) : image);
@@ -128,53 +132,110 @@ namespace Thumbnails.HtmlHelpers
 		/// <param name="size">A Size object containing the desired width and height of the thumbnail</param>
 		private static void CreateThumbnail(Image originalImage, string savePath, Size size)
 		{
-			Image source;
+			Image resized, thumbnail;
+            double originalAspectRatio = (double)originalImage.Width / (double)originalImage.Height;
+            double newAspectRatio = (double)size.Width / (double)size.Height;
 
-			//this image is already the correct size - don't just copy it into the new directory
+			//this image is already the correct size or is smaller than the requested thumbnail - don't do anything just copy it into the new directory
+            //TODO: should images smaller than requested thumbnail be stretched?
 			if (originalImage.Width == size.Width && originalImage.Height == size.Height)
 			{
-				source = (Image)originalImage.Clone();
-				source.Save(savePath);
-				return;
+				thumbnail = (Image)originalImage.Clone();
 			}
-
-			if (originalImage.Width <= size.Width && originalImage.Height <= size.Height)
+			else if (originalAspectRatio != newAspectRatio)
 			{
-				source = (Image)originalImage.Clone();
-				source.Save(savePath);
-				return;
+                //if the new thumbnail does not have the same aspect ratio as the source resize first, then crop
+                resized = ResizeImage(originalImage, size);
+                thumbnail = CropImage(resized, size);
 			}
+            else
+            {
+                //the aspect ratio either hasn't changed or is a perfect square so no need to crop
+                resized = ResizeImage(originalImage, size);
+                thumbnail = resized;
+            }
 
-			//The image needs to be cropped before it can be resized
-			//TODO: there is probably a better way to crop the image
-			if (originalImage.Width != originalImage.Height)
-			{
-				int sizeToUse = originalImage.Width > originalImage.Height ? originalImage.Height : originalImage.Width;
-				Rectangle cropRect = new Rectangle(0, 0, sizeToUse, sizeToUse);
-				source = new Bitmap(cropRect.Width, cropRect.Height);
-
-				//Set the source to the new cropped image
-				using (Graphics gr = Graphics.FromImage(source))
-				{
-					gr.InterpolationMode = InterpolationMode.HighQualityBicubic;
-					gr.DrawImage(originalImage, new Rectangle(0, 0, source.Width, source.Height), cropRect, GraphicsUnit.Pixel);
-				}
-			}
-			else
-			{
-				//originalImage is a perfect square so no need to crop
-				source = originalImage;
-			}
-
-			//resize the image
-			Image thumbnail = new Bitmap(size.Width, size.Height);
-			using (Graphics gr = Graphics.FromImage(thumbnail))
-			{
-				gr.InterpolationMode = InterpolationMode.HighQualityBicubic;
-				gr.DrawImage(source, 0, 0, size.Width, size.Height);
-			}
 			thumbnail.Save(savePath);
 		}
+
+        /// <summary>
+        /// Returns a resized version of the source image. 
+        /// The resulting image size will be as close to the desired size as possible, maintaining the source image aspect ratio
+        /// </summary>
+        /// <param name="source">The image that needs to be resized</param>
+        /// <param name="size">The desired size</param>
+        /// <returns>Resized image</returns>
+        private static Image ResizeImage(Image source, Size size)
+        {
+            Image resized;
+            int tmpHeight, tmpWidth;
+            double originalAspectRatio = (double)source.Width / (double)source.Height;
+            double newAspectRatio = (double)size.Width / (double)size.Height;
+
+            if (newAspectRatio == originalAspectRatio)
+            {
+                //if the aspect ratio hasn't changed there is no need to modify the desired size
+                tmpWidth = size.Width;
+                tmpHeight = size.Height;
+            }
+            //if the aspect ratio of the desired size is different than the source image then calculate the height needed to maintain the aspect ratio of the source
+            else if (size.Width > size.Height)
+            {
+                //the desired size is wider than tall
+                tmpWidth = size.Width;
+                tmpHeight = (int)(tmpWidth / originalAspectRatio);
+            }
+            else if (size.Width < size.Height)
+            {
+                //the desired size is taller than wide
+                tmpHeight = size.Height;
+                tmpWidth = (int)(tmpHeight * originalAspectRatio);
+            }
+            else
+            {
+                //the desired size is a square
+                if (source.Width > source.Height)
+                {
+                    tmpHeight = size.Height;
+                    tmpWidth = (int)(tmpHeight * originalAspectRatio);
+                }
+                else
+                {
+                    tmpWidth = size.Width;
+                    tmpHeight = (int)(tmpWidth / originalAspectRatio);
+                }
+            }
+
+            resized = new Bitmap(tmpWidth, tmpHeight);
+            using (Graphics gr = Graphics.FromImage(resized))
+            {
+                gr.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                gr.DrawImage(source, 0, 0, resized.Width, resized.Height);
+            }
+            return resized;
+        }
+
+        /// <summary>
+        /// Returns a cropped version of the image for the specified size - always crops from top left (0,0)
+        /// </summary>
+        /// <param name="source">Image to crop</param>
+        /// <param name="size">Size of resulting image</param>
+        /// <returns>Cropped image</returns>
+        private static Image CropImage(Image source, Size size)
+        {
+            //TODO: it might be better to try to center the rectangle to crop, rather than always doing 0,0 (top left)
+            Rectangle cropRect = new Rectangle(0, 0, size.Width, size.Height);
+            Image result = new Bitmap(cropRect.Width, cropRect.Height);
+
+            //Set the source to the new cropped image
+            using (Graphics gr = Graphics.FromImage(result))
+            {
+                gr.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                gr.DrawImage(source, new Rectangle(0, 0, result.Width, result.Height), cropRect, GraphicsUnit.Pixel);
+            }
+
+            return result;
+        }
 		#endregion
 	}
 }

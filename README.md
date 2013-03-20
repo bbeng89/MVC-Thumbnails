@@ -18,7 +18,7 @@ For example, an alias named "Large" that is defined as 150x150 would store its i
 
 Todo
 ----
-This project could use a lot of improvements, especially for cropping images. Also it currently only really works for square thumbnails. Allowing rectangular thumbnails should be a pretty easy fix, I just haven't gotten around to it yet. It also really needs tests and better exception handling.
+This project could use a lot of improvements, especially for cropping images. It also really needs thorough testing, unit tests, and better exception handling.
 
 
 Usage
